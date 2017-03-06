@@ -117,19 +117,19 @@ func (a *gridStruct) FindPath(config AStarConfig, source, target []Point) *PathP
         surrounding := a.getSurrounding(current.Point)
 
         for _, p := range surrounding {
-            _, ok := closeList[p]
+            _, ok := closeList[p.p]
             if ok {
                 continue
             }
 
             a.tileLock.Lock()
-            fill_weight := a.filledTiles[p]
+            fill_weight := a.filledTiles[p.p]
             a.tileLock.Unlock()
 
             path_point := &PathPoint{
-                Point:        p,
+                Point:        p.p,
                 Parent:       current,
-                FillWeight:   current.FillWeight + fill_weight,
+                FillWeight:   current.FillWeight + fill_weight + p.w,
                 DistTraveled: current.DistTraveled + 1,
             }
 
@@ -141,9 +141,9 @@ func (a *gridStruct) FindPath(config AStarConfig, source, target []Point) *PathP
                 continue
             }
 
-            existing_point, ok := openList[p]
+            existing_point, ok := openList[p.p]
             if !ok {
-                openList[p] = path_point
+                openList[p.p] = path_point
             } else {
                 if path_point.Weight < existing_point.Weight {
                     existing_point.Parent = path_point.Parent
@@ -172,23 +172,41 @@ func (a *gridStruct) getMinWeight(openList map[Point]*PathPoint) *PathPoint {
     return min
 }
 
-func (a *gridStruct) getSurrounding(p Point) []Point {
-    var surrounding []Point
+type weightedPoint struct {
+    p Point
+    w int
+}
 
+func (a *gridStruct) getSurrounding(p Point) []weightedPoint {
+    var surrounding []weightedPoint
+    penaltyDiagonal := 3
+    penaltyStraight := 2
     row, col := p.Row, p.Col
 
     if row > 0 {
-        surrounding = append(surrounding, Point{row - 1, col})
+        surrounding = append(surrounding, weightedPoint{Point{row - 1, col},penaltyStraight})
+        if col > 0 {
+            surrounding = append(surrounding, weightedPoint{ Point{row - 1, col - 1},penaltyDiagonal})
+        }
+        if col < a.cols-1 {
+            surrounding = append(surrounding, weightedPoint{ Point{row - 1, col + 1},penaltyDiagonal})
+        }
     }
     if row < a.rows-1 {
-        surrounding = append(surrounding, Point{row + 1, col})
+        surrounding = append(surrounding,  weightedPoint{Point{row + 1, col},penaltyStraight})
+        if col > 0 {
+            surrounding = append(surrounding,  weightedPoint{Point{row + 1, col - 1},penaltyDiagonal})
+        }
+        if col < a.cols-1 {
+            surrounding = append(surrounding,  weightedPoint{Point{row + 1, col + 1},penaltyDiagonal})
+        }
     }
 
     if col > 0 {
-        surrounding = append(surrounding, Point{row, col - 1})
+        surrounding = append(surrounding,  weightedPoint{Point{row, col - 1},penaltyStraight})
     }
     if col < a.cols-1 {
-        surrounding = append(surrounding, Point{row, col + 1})
+        surrounding = append(surrounding,  weightedPoint{Point{row, col + 1},penaltyStraight})
     }
 
     return surrounding
@@ -217,7 +235,7 @@ type PathPoint struct {
     WeightData interface{}
 }
 
-// Manhattan distance NOT euclidean distance because in our routing we cant go diagonally between the points.
+// Dist calculates the euclidean distance
 func (p Point) Dist(other Point) int {
-    return int(math.Abs(float64(p.Row-other.Row)) + math.Abs(float64(p.Col-other.Col)))
+    return int(math.Sqrt(math.Pow(float64(p.Row-other.Row), 2) + math.Pow(float64(p.Col-other.Col),2)))
 }

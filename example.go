@@ -7,7 +7,7 @@ import (
 )
 
 import (
-    "github.com/nickdavies/go-astar/astar"
+    "github.com/mier85/go-astar/astar"
 )
 
 func main() {
